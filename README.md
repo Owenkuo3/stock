@@ -1,14 +1,18 @@
 # stock-strategy-analyzer
 
-`stock-strategy-analyzer` 是一個以 CLI 執行的股票策略分析工具。輸入股票代號、分析週期、分析基準日、篩選模式與策略後，系統會抓取歷史日 K 資料、計算技術指標，並輸出 JSON 格式分析結果。
+`stock-strategy-analyzer` 是一個 CLI 股票策略分析工具，透過歷史日 K 資料評估目前進場位置。
 
-## 專案目的
+## 專案定位（重要）
 
-- 快速評估股票在指定交易日的技術面狀態。
-- 支援兩種第一版策略：
-  - `risk_reward`：低風險風報比分析。
-  - `momentum`：飆股/強勢動能分析。
-- 第一版不包含：看跌模式、推播、AI 預測、自動下單、財報/新聞分析、回測系統。
+本工具是「K 線進場位置評論器」，不是「持有 N 天報酬預測器」。
+
+- `lookback` 是觀察區間，不是持有天數。
+- `lookback=60` 代表：用過去 60 個交易日判斷目前價格位置，不代表預計持有 60 天。
+- 工具用來輔助判斷：
+  - 是否接近前高、追高風險是否偏高
+  - 是否靠近支撐、風報比是否較佳
+  - 停損距離是否合理
+  - 是否適合列入觀察
 
 ## 安裝方式
 
@@ -18,104 +22,80 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-## 使用方式
+## CLI 使用方式
 
 ```bash
-python main.py --symbol <SYMBOL> --lookback <20|60|120|240> --mode <loose|standard|strict> --strategy <risk_reward|momentum> [--analysis-date YYYY-MM-DD]
+python main.py \
+  --symbol <SYMBOL> \
+  --lookback <20|60|120|240> \
+  --mode <loose|standard|strict> \
+  --strategy <risk_reward|momentum> \
+  [--analysis-date YYYY-MM-DD] \
+  [--trade-horizon short|swing|position] \
+  [--stop-method structure|volatility|hybrid]
 ```
 
-## CLI 範例
+- `--trade-horizon` 預設 `swing`，用來決定停損參考週期，不是報酬預測期間。
+- `--stop-method` 預設 `hybrid`，用來決定主要停損價格的選擇方式。
 
-```bash
-python main.py --symbol 2330.TW --lookback 60 --mode standard --strategy risk_reward
-python main.py --symbol AAPL --lookback 120 --mode strict --strategy risk_reward --analysis-date 2025-10-01
-python main.py --symbol 3661.TW --lookback 60 --mode standard --strategy momentum
-python main.py --symbol TSLA --lookback 60 --mode strict --strategy momentum --analysis-date 2025-10-01
-```
+## 參數意義
 
-## 日期與 lookback 規則
+### lookback（區間觀察）
 
-- `lookback` 代表**交易日**，不是自然日。
-- `analysis_date` 是分析基準日。
-- 若未提供 `analysis_date`，預設使用最新交易日。
-- 若 `analysis_date` 不是交易日，會回退到該日期之前最近一個交易日作為 `effective_analysis_date`。
-- 所有指標僅使用 `effective_analysis_date` 當日（含）之前資料，避免 future leakage。
+- 用於 `recent_high` / `recent_low` / `target_price` / 區間位置判斷。
+- 代表「看目前價格在大區間的位置」。
 
-## 策略說明
+### trade_horizon（停損週期）
 
-### 1) risk_reward
+- 用於 `structure_stop_price` / `volatility_stop_price` / `selected_stop_price`。
+- 代表「決定這次進場評估時，停損要看多短或多長」。
 
-評估目前進場位置的：
+規則：
 
-- 預估報酬率（以 lookback 區間高點為目標價）
-- 預估虧損率（結構停損 vs 2ATR 停損取較低價）
-- 風報比
-- 波動等級與風險等級
+- `short`：`structure_stop_window=10`、`atr_multiplier=1.5`
+- `swing`：`structure_stop_window=20`、`atr_multiplier=2.0`（預設）
+- `position`：`structure_stop_window=60`、`atr_multiplier=2.5`
 
-#### risk_reward 風險等級規則
+### stop_method（停損選擇方式）
 
-- E 級優先：`trend == weak` 或 `expected_loss_pct > 10` 或 `atr_pct >= 8` 或 `expected_return_pct <= 0`。
-- A/B/C/D 依風報比、趨勢與預估虧損率判定。
-- 若波動等級為 `extreme`，最高只能給 C。
+- `structure`：`selected_stop_price = structure_stop_price`
+- `volatility`：`selected_stop_price = volatility_stop_price`
+- `hybrid`：同時計算兩種停損，依 ATR 安全倍數與虧損率選較合理者
 
-### 2) momentum
+## 日期規則
 
-評估是否有轉強/加速動能，同時量化追高風險。
+- `analysis_date` 未提供時，使用最新交易日。
+- 若 `analysis_date` 不是交易日，會回退到前一個交易日。
+- 所有指標只使用 `effective_analysis_date` 當日（含）以前資料，避免 future leakage。
 
-輸出包含：
+## risk_reward 策略說明（本次重點）
 
-- `momentum_score`（動能分數）
-- `momentum_grade`（動能等級）
-- `risk_score`（追高/波動/假突破/流動性風險分數）
-- `risk_level`
-- `final_decision`
+策略核心問題：
 
-#### momentum 動能分數規則
+> 目前價格作為進場點，風報比是否合理？停損距離是否可接受？
 
-動能分數（0~100）整合以下訊號：
+risk_reward 會同時輸出：
 
-- 是否突破或接近 lookback 高點
-- 當日量能與量能趨勢
-- 均線結構（多頭排列）
-- 5 日/20 日漲幅
-- 價格是否在 MA20/MA60 之上
-- 並考慮過熱與過高波動扣分，及破線/量縮上限限制
+- `structure_stop_price`
+- `volatility_stop_price`
+- `selected_stop_price`
+- `selected_stop_method`
+- `selected_stop_reason`
 
-#### momentum 風險分數規則
+並且主計算（`expected_loss_pct`、`risk_reward_ratio`、`risk_grade`、`passed_filter`）以 `selected_stop_price` 為準。
 
-風險分數（0~100，越高越危險）整合：
+### 輔助決策輸出
 
-- ATR 波動風險
-- 價格距 MA20 過遠
-- 5 日/20 日漲幅過熱
-- 假突破風險（量價背離）
-- 上影線風險
-- 流動性風險（第一版用 20 日均量粗估）
+- `final_summary`：白話總結目前位置與風險報酬結論。
+- `action_suggestion`：對應風險等級的建議動作（非保證語氣）。
+- `entry_plan`：反推 RR=2、RR=3 的參考進場價，幫助判斷是否追高。
 
-> 注意：台股與美股成交量單位不同，流動性分數門檻應依市場特性調整。
+## momentum 策略說明
 
-## ATR 與波動風險說明
+`momentum` 保留第一版邏輯，用於評估轉強/加速動能，同時輸出動能與追高風險。
 
-ATR14 使用 True Range 的 14 日平均：
+## 風險聲明
 
-- `TR = max(High-Low, abs(High-PrevClose), abs(Low-PrevClose))`
-- `atr_pct = ATR14 / Close * 100`
-
-atr_pct 越高，代表單日平均波動越大，停損被洗出的機率通常越高。
-
-## 錯誤處理
-
-錯誤統一輸出 JSON：
-
-```json
-{
-  "error": "錯誤訊息"
-}
-```
-
-包含：symbol 無效、參數不合法、日期格式錯誤、資料不足、指標 NaN 等。
-
-## 免責聲明
-
-- 本工具不是投資建議，僅根據歷史 K 線進行量化分析。
+- 本工具不是投資建議，不保證未來報酬。
+- 本工具不是未來價格預測器，而是進場位置評估輔助工具。
 - `yfinance` 資料可能延遲或不完整，正式使用前請驗證資料來源。
