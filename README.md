@@ -1,6 +1,6 @@
 # stock-strategy-analyzer
 
-`stock-strategy-analyzer` 是一個 CLI 股票策略分析工具，透過歷史日 K 資料評估目前進場位置。
+`stock-strategy-analyzer` 是一個股票策略分析工具，支援 CLI 與 Web 介面，透過歷史日 K 資料評估目前進場位置。
 
 ## 專案定位（重要）
 
@@ -37,6 +37,28 @@ python main.py \
 
 - `--trade-horizon` 預設 `swing`，用來決定停損參考週期，不是報酬預測期間。
 - `--stop-method` 預設 `hybrid`，用來決定主要停損價格的選擇方式。
+
+## Web 使用方式
+
+```bash
+python web_app.py
+```
+
+啟動後開啟：
+
+- `http://127.0.0.1:5000`
+
+可直接在表單輸入：
+
+- symbol
+- lookback
+- mode
+- strategy
+- analysis_date
+- trade_horizon
+- stop_method
+
+按下「開始分析」後，會顯示 JSON 結果。
 
 ## 參數意義
 

@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <title>Stock Strategy Analyzer</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 24px; background: #f7f8fa; }
+    .card { background: #fff; border-radius: 10px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,.08); margin-bottom: 16px; }
+    label { display: block; margin-top: 10px; font-weight: 600; }
+    input, select, button, textarea { width: 100%; padding: 8px; margin-top: 6px; box-sizing: border-box; }
+    button { background: #2563eb; color: white; border: none; border-radius: 6px; cursor: pointer; margin-top: 14px; }
+    button:hover { background: #1d4ed8; }
+    .error { color: #b91c1c; font-weight: 700; }
+    pre { white-space: pre-wrap; background: #111827; color: #e5e7eb; padding: 16px; border-radius: 8px; overflow: auto; }
+    .hint { color: #374151; font-size: 14px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h2>Stock Strategy Analyzer（Web）</h2>
+    <p class="hint">輸入參數後按「開始分析」，下方會顯示 JSON 結果。</p>
+    <form method="post">
+      <label>Symbol</label>
+      <input name="symbol" value="{{ form_data.symbol }}" required>
+
+      <label>Lookback</label>
+      <select name="lookback">
+        {% for x in lookbacks %}
+          <option value="{{ x }}" {% if form_data.lookback == x|string %}selected{% endif %}>{{ x }}</option>
+        {% endfor %}
+      </select>
+
+      <label>Mode</label>
+      <select name="mode">
+        {% for x in modes %}
+          <option value="{{ x }}" {% if form_data.mode == x %}selected{% endif %}>{{ x }}</option>
+        {% endfor %}
+      </select>
+
+      <label>Strategy</label>
+      <select name="strategy">
+        {% for x in strategies %}
+          <option value="{{ x }}" {% if form_data.strategy == x %}selected{% endif %}>{{ x }}</option>
+        {% endfor %}
+      </select>
+
+      <label>Analysis Date (YYYY-MM-DD，可留空)</label>
+      <input name="analysis_date" value="{{ form_data.analysis_date }}">
+
+      <label>Trade Horizon</label>
+      <select name="trade_horizon">
+        {% for x in trade_horizons %}
+          <option value="{{ x }}" {% if form_data.trade_horizon == x %}selected{% endif %}>{{ x }}</option>
+        {% endfor %}
+      </select>
+
+      <label>Stop Method</label>
+      <select name="stop_method">
+        {% for x in stop_methods %}
+          <option value="{{ x }}" {% if form_data.stop_method == x %}selected{% endif %}>{{ x }}</option>
+        {% endfor %}
+      </select>
+
+      <button type="submit">開始分析</button>
+    </form>
+  </div>
+
+  {% if error %}
+  <div class="card">
+    <p class="error">錯誤：{{ error }}</p>
+  </div>
+  {% endif %}
+
+  {% if result_json %}
+  <div class="card">
+    <h3>分析結果（JSON）</h3>
+    <pre>{{ result_json }}</pre>
+  </div>
+  {% endif %}
+</body>
+</html>
