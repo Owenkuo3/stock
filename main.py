@@ -8,7 +8,9 @@ from strategies import analyze_momentum, analyze_risk_reward
 from utils import (
     ALLOWED_LOOKBACKS,
     ALLOWED_MODES,
+    ALLOWED_STOP_METHODS,
     ALLOWED_STRATEGIES,
+    ALLOWED_TRADE_HORIZONS,
     error_json,
     parse_analysis_date,
     round_value,
@@ -38,6 +40,26 @@ COMMON_NUMERIC_FIELDS = [
 ]
 
 
+RISK_REWARD_NUMERIC_FIELDS = [
+    "structure_stop_window",
+    "atr_multiplier",
+    "target_price",
+    "structure_stop_price",
+    "volatility_stop_price",
+    "selected_stop_price",
+    "structure_expected_loss_pct",
+    "volatility_expected_loss_pct",
+    "expected_loss_pct",
+    "structure_stop_atr_multiple",
+    "volatility_stop_atr_multiple",
+    "stop_atr_multiple",
+    "expected_return_pct",
+    "structure_risk_reward_ratio",
+    "volatility_risk_reward_ratio",
+    "risk_reward_ratio",
+]
+
+
 def parse_args():
     parser = argparse.ArgumentParser(description="Stock strategy analyzer")
     parser.add_argument("--symbol", required=True, type=str)
@@ -45,13 +67,29 @@ def parse_args():
     parser.add_argument("--mode", required=True, type=str)
     parser.add_argument("--strategy", required=True, type=str)
     parser.add_argument("--analysis-date", required=False, type=str, default=None)
+    parser.add_argument("--trade-horizon", required=False, type=str, default="swing")
+    parser.add_argument("--stop-method", required=False, type=str, default="hybrid")
     return parser.parse_args()
+
+
+def _round_nested_entry_plan(entry_plan: dict):
+    rounded = {}
+    for key, value in entry_plan.items():
+        if isinstance(value, (int, float)):
+            rounded[key] = round_value(value, 2)
+        else:
+            rounded[key] = value
+    return rounded
 
 
 def to_serializable(result: dict):
     for key in list(result.keys()):
-        if key in COMMON_NUMERIC_FIELDS or key.endswith("_pct") or key.endswith("_price") or key.endswith("_ratio") or key.endswith("_multiple"):
+        if key in COMMON_NUMERIC_FIELDS or key in RISK_REWARD_NUMERIC_FIELDS or key.endswith("_pct") or key.endswith("_price") or key.endswith("_ratio") or key.endswith("_multiple"):
             result[key] = round_value(result[key], 2)
+
+    if "entry_plan" in result and isinstance(result["entry_plan"], dict):
+        result["entry_plan"] = _round_nested_entry_plan(result["entry_plan"])
+
     return result
 
 
@@ -65,6 +103,10 @@ def main():
             raise ValueError("mode 不在允許值內，僅允許 loose/standard/strict")
         if args.strategy not in ALLOWED_STRATEGIES:
             raise ValueError("strategy 不在允許值內，僅允許 risk_reward/momentum")
+        if args.trade_horizon not in ALLOWED_TRADE_HORIZONS:
+            raise ValueError("trade_horizon 不在允許值內，僅允許 short/swing/position")
+        if args.stop_method not in ALLOWED_STOP_METHODS:
+            raise ValueError("stop_method 不在允許值內，僅允許 structure/volatility/hybrid")
 
         analysis_date_dt = parse_analysis_date(args.analysis_date)
 
@@ -109,7 +151,13 @@ def main():
         }
 
         if args.strategy == "risk_reward":
-            result = analyze_risk_reward(base, args.mode)
+            result = analyze_risk_reward(
+                base=base,
+                mode=args.mode,
+                sliced_df=sliced,
+                trade_horizon=args.trade_horizon,
+                stop_method=args.stop_method,
+            )
         else:
             result = analyze_momentum(base, args.mode, row.to_dict())
 

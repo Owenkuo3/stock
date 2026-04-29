@@ -6,6 +6,15 @@ from typing import Any
 ALLOWED_LOOKBACKS = {20, 60, 120, 240}
 ALLOWED_MODES = {"loose", "standard", "strict"}
 ALLOWED_STRATEGIES = {"risk_reward", "momentum"}
+ALLOWED_TRADE_HORIZONS = {"short", "swing", "position"}
+ALLOWED_STOP_METHODS = {"structure", "volatility", "hybrid"}
+
+
+TRADE_HORIZON_CONFIG = {
+    "short": {"structure_stop_window": 10, "atr_multiplier": 1.5},
+    "swing": {"structure_stop_window": 20, "atr_multiplier": 2.0},
+    "position": {"structure_stop_window": 60, "atr_multiplier": 2.5},
+}
 
 
 def round_value(value: Any, digits: int = 2):
