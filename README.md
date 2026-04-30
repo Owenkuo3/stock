@@ -94,6 +94,27 @@ risk_reward 會同時輸出：
 
 `momentum` 保留第一版邏輯，用於評估轉強/加速動能，同時輸出動能與追高風險。
 
+
+## Web 頁面使用方式
+
+此 repo 也提供一個零額外相依的前端頁面（內建 HTTP server）：
+
+```bash
+python web_ui.py
+```
+
+啟動後打開：`http://localhost:8000`
+
+你可以在頁面上填入：
+- symbol / lookback / mode / strategy
+- analysis_date（可選）
+- market（US / TW）
+- trade_horizon / stop_method（頁面有中文說明）
+
+台股模式下，如果 symbol 輸入純數字（例如 `2330`），系統會自動轉成 `2330.TW`。
+
+按下「開始分析」後，會呼叫後端 `/analyze`，回傳與 CLI 一致的 JSON。
+
 ## 風險聲明
 
 - 本工具不是投資建議，不保證未來報酬。
